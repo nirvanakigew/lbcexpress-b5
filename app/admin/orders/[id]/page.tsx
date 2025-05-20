@@ -11,12 +11,32 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TrackingTimeline } from "@/components/tracking-timeline"
-import { formatDate, ORDER_STATUSES } from "@/lib/utils"
-import { Package, Truck, MapPin, Calendar, User, Phone, FileText, ArrowLeft, Plus } from "lucide-react"
+import { formatDate, formatDateTime, ORDER_STATUSES } from "@/lib/utils"
+import {
+  Package,
+  Truck,
+  MapPin,
+  Calendar,
+  User,
+  Phone,
+  FileText,
+  ArrowLeft,
+  Plus,
+  Trash2,
+  AlertTriangle,
+} from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import type { Order, TrackingHistory } from "@/types"
 import Link from "next/link"
 import { toast } from "@/components/ui/use-toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 export default function AdminOrderDetailPage({ params }: { params: { id: string } }) {
   const [isLoading, setIsLoading] = useState(true)
@@ -26,6 +46,8 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
   const [newLocation, setNewLocation] = useState("")
   const [newDescription, setNewDescription] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -147,6 +169,40 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
     }
   }
 
+  const handleDeleteOrder = async () => {
+    if (!order) return
+
+    setIsDeleting(true)
+    try {
+      // First delete tracking history
+      const { error: trackingError } = await supabase.from("tracking_history").delete().eq("order_id", params.id)
+
+      if (trackingError) throw trackingError
+
+      // Then delete the order
+      const { error: orderError } = await supabase.from("orders").delete().eq("id", params.id)
+
+      if (orderError) throw orderError
+
+      toast({
+        title: "Order deleted",
+        description: `Order ${order.tracking_number} has been deleted successfully.`,
+      })
+
+      // Redirect to orders page
+      router.push("/admin/orders")
+    } catch (error) {
+      console.error("Error deleting order:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete order. Please try again.",
+        variant: "destructive",
+      })
+      setIsDeleting(false)
+      setShowDeleteDialog(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "delivered":
@@ -170,14 +226,27 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
     <>
       <AdminHeader />
       <div className="container py-6">
-        <div className="flex items-center mb-6">
-          <Button variant="outline" size="sm" asChild className="mr-4">
-            <Link href="/admin/orders">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Orders
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">Order Details</h1>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Button variant="outline" size="sm" asChild className="mr-4">
+              <Link href="/admin/orders">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Orders
+              </Link>
+            </Button>
+            <h1 className="text-2xl font-bold">Order Details</h1>
+          </div>
+          {order && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Order
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
@@ -230,7 +299,7 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
                                 ? `Expected Delivery: ${formatDate(order.delivery_date)}`
                                 : "Delivery Date: Not available"}
                             </p>
-                            <p className="text-sm text-gray-600">Created: {formatDate(order.created_at)}</p>
+                            <p className="text-sm text-gray-600">Created: {formatDateTime(order.created_at)}</p>
                           </div>
                         </div>
                       </div>
@@ -406,6 +475,45 @@ export default function AdminOrderDetailPage({ params }: { params: { id: string 
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Confirm Deletion
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete order <span className="font-bold">{order?.tracking_number}</span>? This
+              action cannot be undone and will permanently remove the order and all its tracking history.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col sm:flex-row sm:justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteOrder}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Order
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

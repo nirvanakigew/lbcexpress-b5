@@ -1,8 +1,9 @@
+import type React from "react"
 import Link from "next/link"
 import { LBCLogo } from "@/components/ui/lbc-logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, Package, Menu, Phone, MapPin } from "lucide-react"
+import { Search, Package, Menu, MapPin } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
 export function SiteHeader() {
@@ -52,10 +53,10 @@ export function SiteHeader() {
             </Link>
           </Button>
           <Button asChild variant="ghost">
-            <Link href="/contact">
-              <Phone className="mr-2 h-4 w-4" />
+            <a href="https://wa.me/639616312656" target="_blank" rel="noopener noreferrer">
+              <WhatsAppIcon className="mr-2 h-4 w-4" />
               Contact
-            </Link>
+            </a>
           </Button>
         </div>
         <Sheet>
@@ -79,9 +80,15 @@ export function SiteHeader() {
               <Link href="/about" className="font-medium hover:text-[#c9002f]">
                 About
               </Link>
-              <Link href="/contact" className="font-medium hover:text-[#c9002f]">
-                Contact
-              </Link>
+              <a
+                href="https://wa.me/639616312656"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium hover:text-[#c9002f] flex items-center gap-2"
+              >
+                <WhatsAppIcon className="h-4 w-4" />
+                Contact (+63 961-631-2656)
+              </a>
               <Link href="/branch-locator" className="font-medium hover:text-[#c9002f]">
                 Branch Locator
               </Link>
@@ -90,5 +97,28 @@ export function SiteHeader() {
         </Sheet>
       </div>
     </header>
+  )
+}
+
+// WhatsApp Icon Component
+function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
+      <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1Z" />
+      <path d="M14 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1Z" />
+      <path d="M9.5 13.5c.5 1 1.5 1 2.5 1s2-.5 2.5-1" />
+    </svg>
   )
 }

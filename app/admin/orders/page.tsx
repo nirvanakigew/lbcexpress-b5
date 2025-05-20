@@ -18,11 +18,21 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import { Package, Search, Filter, Plus } from "lucide-react"
+import { Package, Search, Filter, Plus, Trash2, AlertTriangle, MoreHorizontal } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import type { Order } from "@/types"
 import Link from "next/link"
 import { formatDate } from "@/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { toast } from "@/components/ui/use-toast"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export default function AdminOrdersPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -32,6 +42,8 @@ export default function AdminOrdersPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalOrders, setTotalOrders] = useState(0)
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const pageSize = 10
   const router = useRouter()
 
@@ -94,6 +106,43 @@ export default function AdminOrdersPage() {
   const handleStatusChange = (value: string) => {
     setStatusFilter(value)
     setCurrentPage(1) // Reset to first page on filter change
+  }
+
+  const handleDeleteOrder = async () => {
+    if (!orderToDelete) return
+
+    setIsDeleting(true)
+    try {
+      // First delete tracking history
+      const { error: trackingError } = await supabase.from("tracking_history").delete().eq("order_id", orderToDelete.id)
+
+      if (trackingError) throw trackingError
+
+      // Then delete the order
+      const { error: orderError } = await supabase.from("orders").delete().eq("id", orderToDelete.id)
+
+      if (orderError) throw orderError
+
+      // Update local state
+      setOrders(orders.filter((order) => order.id !== orderToDelete.id))
+      setTotalOrders((prev) => prev - 1)
+
+      toast({
+        title: "Order deleted",
+        description: `Order ${orderToDelete.tracking_number} has been deleted successfully.`,
+      })
+
+      setOrderToDelete(null)
+    } catch (error) {
+      console.error("Error deleting order:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete order. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -216,9 +265,25 @@ export default function AdminOrdersPage() {
                           <TableCell>{formatDate(order.created_at)}</TableCell>
                           <TableCell>{formatDate(order.delivery_date)}</TableCell>
                           <TableCell>
-                            <Button variant="outline" size="sm" asChild className="text-[#c9002f]">
-                              <Link href={`/admin/orders/${order.id}`}>View</Link>
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/admin/orders/${order.id}`}>View Details</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-red-600 focus:text-red-600"
+                                  onClick={() => setOrderToDelete(order)}
+                                >
+                                  Delete Order
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -276,6 +341,45 @@ export default function AdminOrdersPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!orderToDelete} onOpenChange={(open) => !open && setOrderToDelete(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Confirm Deletion
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete order <span className="font-bold">{orderToDelete?.tracking_number}</span>?
+              This action cannot be undone and will permanently remove the order and all its tracking history.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col sm:flex-row sm:justify-end gap-2">
+            <Button variant="outline" onClick={() => setOrderToDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteOrder}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Order
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
